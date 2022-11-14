@@ -84,7 +84,7 @@ handleargs(char *args)
         exit(0);
     }
 
-    char* token = strtok(args, " ");
+    char *token = strtok(args, " ");
 
     // Parse args between whitespace into parsed string
     while (token != NULL)
@@ -108,12 +108,17 @@ handleargs(char *args)
     }
 
     token[pos] = NULL;
+}
 
-    //Handle Commands from parsed string
-    pid_t pid = fork();
+int handlecmds(char **cmds)
+{
+    int status;
+    pid_t pid, wpid;
+
+    pid = fork();
 
     // If this is not the child or parent process
-    if (pid == -1)
+    if (pid < 0)
     {
         printf("\n Failed to fork a child process");
         return;
@@ -123,7 +128,7 @@ handleargs(char *args)
     else if (pid == 0)
     {
         // execvp(cmd[0], cmd) -> cmd is a char**
-        if (execvp(parsedstr[0], parsedstr) < 0)
+        if (execvp(cmds[0], cmds) == -1)
         {
             printf("\n execvp failed");
         }
@@ -133,29 +138,38 @@ handleargs(char *args)
     // If this is the parent, wait for child to finish wait() -> (rv = wait(&satus))
     else
     {
-        wait(NULL);
-        return;
+        do
+        {
+            wpid = waitpid(pid, &status, WUNTRACED);
+        } 
+        while (!WIFEXITED(status) && !WIFSIGNALED(status));
     }
+
+    return 1;
 }
 
 int main(int argc, char **argv)
 {
     // string input in command line
-    char inputStr, **args;
+    char input, **cmds;
     char prompt;
     int flag;
 
     // Set the shell prompt input by the user
     if (argc > 1)
     {
-        if (strcmp(argv[1], "-"))
+        if (strcmp(argv[1], "-") < 1)
         {
             // hyphen
-            strcpy(prompt, "");
+            strcpy(prompt, ": ");
         }
         else
         {
-            strcpy(prompt, argv[1]);
+            char *result = malloc(strlen(argv[1]) + strlen(": ") + 1);
+            strcpy(result, argv[1]);
+            strcat(result, ": ");
+            strcpy(prompt, result);
+            free(result);
         }
     }
     else
@@ -164,21 +178,25 @@ int main(int argc, char **argv)
     }
 
     // Loop for input
-    while (1)
+    while (flag)
     {
         // Print shell prompt
         print("\n %s", prompt);
 
         // Get user input
-        inputStr = getinput();
+        input = getinput();
         // Handle any arguments
-        handleargs(inputStr);
+        cmds = handleargs(input);
+        flag = handlecmds(cmds);
 
         // check for "exit" command
-        if (!strcmp("exit", inputStr))
+        if (!strcmp("exit", input))
         {
             break;
         }
+
+        free(input);
+        free(cmds);
     }
 
     return (0);
