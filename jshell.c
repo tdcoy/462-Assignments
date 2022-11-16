@@ -8,6 +8,7 @@
 #define MAXINPUT 1000
 #define MAXCMD 100
 
+int hasampersand = 0;
 /***********************************************************************
 This is a shell that will involve calling six key system call wrappers: fork(), execvp(), pipe(), dup2(), open(), and close().
 This shell will support pipes ('|'), file redirection ('<', '>', '>>'), and a request to run a program in the background ('&').
@@ -49,6 +50,9 @@ char *getinput(void)
             // Set null terminator
             buffer[pos] = '\0';
             return buffer;
+        }
+        else if(c == '&'){
+            hasampersand = 1;
         }
         else
         {
@@ -114,7 +118,7 @@ int handlecmds(char **cmds)
 {
     int status;
     pid_t pid, wpid;
-
+    
     pid = fork();
 
     // If this is not the child or parent process
@@ -138,10 +142,12 @@ int handlecmds(char **cmds)
     // If this is the parent, wait for child to finish wait() -> (rv = wait(&satus))
     else
     {
-        do
-        {
-            wpid = waitpid(pid, &status, WUNTRACED);
-        } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+        if(hasampersand){
+            while(wait(NULL) != pid);
+        }
+        else{
+            printf("\n Failed to fork.");
+        }
     }
 
     return 1;
@@ -157,12 +163,12 @@ int main(int argc, char **argv)
     // Set the shell prompt input by the user
     if (argc > 1)
     {
-        //No prompt
+        // No prompt
         if (strcmp(argv[1], "-") < 1)
         {
             strcpy(prompt, ": ");
         }
-        //Users prompt
+        // Users prompt
         else
         {
             char *result = malloc(strlen(argv[1]) + strlen(": ") + 1);
@@ -187,13 +193,14 @@ int main(int argc, char **argv)
         input = getinput();
         // Handle any arguments
         cmds = handleargs(input);
-        flag = handlecmds(cmds);
 
         // check for "exit" command
         if (!strcmp("exit", input))
         {
             break;
         }
+
+        flag = handlecmds(cmds);
 
         free(input);
         free(cmds);
